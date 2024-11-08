@@ -1,24 +1,26 @@
+# Use arguments for version numbers
+ARG POSTGRES_VERSION=16
+ARG POSTGIS_VERSION=3.5
+
 # Use the PostGIS image as the base
-FROM postgis/postgis:13-3.4
+FROM 954039218418.dkr.ecr.eu-west-2.amazonaws.com/postgis:${POSTGRES_VERSION}-${POSTGIS_VERSION}-arm-debian
 
-# Install necessary packages
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-       build-essential \
-       libpq-dev \
-       wget \
-       git \
-       postgresql-server-dev-13 \
-    # Clean up to reduce layer size
-    && rm -rf /var/lib/apt/lists/* \
-    && git clone --branch v0.5.1 https://github.com/pgvector/pgvector.git /tmp/pgvector \
-    && cd /tmp/pgvector \
-    && make \
-    && make install \
-    # Clean up unnecessary files
-    && cd - \
-    && apt-get purge -y --auto-remove build-essential postgresql-server-dev-13 libpq-dev wget git \
-    && rm -rf /tmp/pgvector
+COPY pgvector-0.7.0.tar.gz /tmp/
 
-# Copy initialization scripts
-COPY ./docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
+RUN apt-get update
+
+RUN tar -xzf /tmp/pgvector-0.7.0.tar.gz && \
+    cd pgvector-0.7.0 && \
+    make clean && \
+    make OPTFLAGS="" && \
+    make install && \
+    mkdir /usr/share/doc/pgvector && \
+    
+ RUN rm -r pgvector-0.7.0 && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Confirm installation by listing extensions
+RUN echo "Extensions installed: \n" && \
+    psql -U postgres -c "CREATE EXTENSION IF NOT EXISTS postgis;" && \
+    psql -U postgres -c "CREATE EXTENSION IF NOT EXISTS vector;"
